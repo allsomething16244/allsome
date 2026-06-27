@@ -27,7 +27,12 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "생체 인증을 사용해 로그인합니다."
+        }
+      ]
     ]
   }
 }
