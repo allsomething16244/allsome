@@ -23,9 +23,7 @@ export default function HomeScreen() {
       if (!user) return;
 
       // 오늘의 매칭 ID 조회 or 생성
-      const { data: matchId, error } = await supabase.rpc('get_or_create_daily_match', {
-        p_user_id: user.id,
-      });
+      const { data: matchId, error } = await supabase.rpc('get_or_create_daily_match');
 
       if (error || !matchId) {
         setNoMatch(true);
