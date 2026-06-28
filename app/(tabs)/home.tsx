@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useFocusEffect, router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 
@@ -11,6 +11,7 @@ interface MatchProfile {
   gender: 'M' | 'F' | null;
   birth_year: number | null;
   company_name: string | null;
+  bio: string | null;
 }
 
 interface RequestState {
@@ -20,60 +21,60 @@ interface RequestState {
 }
 
 const GENDER_LABEL: Record<string, string> = { M: '남성', F: '여성' };
-const CACHE_KEY = 'daily_match_cache';
-
 export default function HomeScreen() {
   const [match, setMatch] = useState<MatchProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [noMatch, setNoMatch] = useState(false);
+  const [noBio, setNoBio] = useState(false);
   const [request, setRequest] = useState<RequestState>({ status: 'none', requestId: null, roomId: null });
   const [requesting, setRequesting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      const today = new Date().toDateString();
-
       const fetchAll = async () => {
         setLoading(true);
         setNoMatch(false);
+        setNoBio(false);
 
-        // daily match (캐시 우선)
-        let matchData: MatchProfile | null = null;
-        const cached = await AsyncStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const { date, data } = JSON.parse(cached);
-          if (date === today) {
-            matchData = data;
-          }
-        }
-
-        if (!matchData) {
-          const { data, error } = await supabase.rpc('get_or_create_daily_match');
-          if (error || !data || data.length === 0) {
-            setNoMatch(true);
+        // 내 bio 체크
+        const { data: { user: me } } = await supabase.auth.getUser();
+        if (me) {
+          const { data: myProfile } = await supabase
+            .from('profiles')
+            .select('bio')
+            .eq('id', me.id)
+            .single();
+          if (!myProfile?.bio || myProfile.bio.trim() === '') {
+            setNoBio(true);
             setLoading(false);
             return;
           }
-          const row = data[0];
-          matchData = {
-            matchUserId: row.match_user_id,
-            nickname: row.nickname,
-            gender: row.gender,
-            birth_year: row.birth_year,
-            company_name: row.company_name,
-          };
-          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ date: today, data: matchData }));
         }
 
-        setMatch(matchData);
+        const { data, error } = await supabase.rpc('get_or_create_daily_match');
+        if (error || !data || data.length === 0) {
+          setNoMatch(true);
+          setLoading(false);
+          return;
+        }
+        const row = data[0];
+        setMatch({
+          matchUserId: row.match_user_id,
+          nickname: row.nickname,
+          gender: row.gender,
+          birth_year: row.birth_year,
+          company_name: row.company_name,
+          bio: row.bio,
+        });
 
         // 채팅 신청 상태 조회 (매번 fresh)
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && matchData.matchUserId) {
+        const matchUserId = row.match_user_id;
+        if (me && matchUserId) {
+          const user = me;
           const { data: reqData } = await supabase
             .from('chat_requests')
             .select('id, status, room_id, from_user_id')
-            .or(`and(from_user_id.eq.${user.id},to_user_id.eq.${matchData.matchUserId}),and(from_user_id.eq.${matchData.matchUserId},to_user_id.eq.${user.id})`)
+            .or(`and(from_user_id.eq.${user.id},to_user_id.eq.${matchUserId}),and(from_user_id.eq.${matchUserId},to_user_id.eq.${user.id})`)
             .maybeSingle();
 
           if (!reqData) {
@@ -128,6 +129,18 @@ export default function HomeScreen() {
     );
   }
 
+  if (noBio) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.emptyText}>자기소개를 먼저 작성해주세요</Text>
+        <Text style={styles.emptySubText}>자기소개를 작성하면{'\n'}오늘의 추천 상대를 만날 수 있어요</Text>
+        <TouchableOpacity style={styles.bioButton} onPress={() => router.push({ pathname: '/(tabs)/profile', params: { editBio: '1' } })}>
+          <Text style={styles.bioButtonText}>자기소개 작성하러 가기</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (noMatch || !match) {
     return (
       <View style={styles.center}>
@@ -145,7 +158,11 @@ export default function HomeScreen() {
 
       <View style={styles.card}>
         <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>{match.nickname[0]}</Text>
+          <Ionicons
+            name={match.gender === 'F' ? 'woman' : 'man'}
+            size={52}
+            color={match.gender === 'F' ? Colors.primary : '#4A90E2'}
+          />
         </View>
 
         <Text style={styles.nickname}>{match.nickname}</Text>
@@ -167,6 +184,13 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
+
+        {match.bio && (
+          <View style={styles.bioBox}>
+            <Text style={styles.bioLabel}>자기소개</Text>
+            <Text style={styles.bioText}>{match.bio}</Text>
+          </View>
+        )}
 
         {/* 채팅 버튼 */}
         {request.status === 'accepted' && (
@@ -222,13 +246,37 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary + '20', alignItems: 'center',
     justifyContent: 'center', marginBottom: 20,
   },
-  avatarText: { fontSize: 40, fontWeight: 'bold', color: Colors.primary },
   nickname: { fontSize: 26, fontWeight: 'bold', color: Colors.text, marginBottom: 20 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   tag: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.border },
   tagPrimary: { backgroundColor: Colors.primary + '18' },
   tagText: { fontSize: 14, color: Colors.textSecondary, fontWeight: '500' },
   tagTextPrimary: { color: Colors.primary },
+  bioBox: {
+    width: '100%',
+    marginTop: 24,
+    backgroundColor: Colors.primary + '0D',
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  bioLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  bioText: {
+    fontSize: 17,
+    color: Colors.text,
+    lineHeight: 28,
+    fontWeight: '300',
+    letterSpacing: 0.3,
+  },
   chatButton: {
     marginTop: 32, width: '100%', height: 48,
     borderRadius: 12, alignItems: 'center', justifyContent: 'center',
@@ -239,5 +287,7 @@ const styles = StyleSheet.create({
   chatButtonTextDisabled: { color: Colors.textSecondary, fontSize: 15, fontWeight: '500' },
   footerNote: { marginTop: 32, fontSize: 13, color: Colors.textSecondary },
   emptyText: { fontSize: 18, fontWeight: '600', color: Colors.text, marginBottom: 8, textAlign: 'center' },
-  emptySubText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  emptySubText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  bioButton: { backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  bioButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });
