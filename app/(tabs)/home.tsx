@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
@@ -17,28 +18,29 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [noMatch, setNoMatch] = useState(false);
 
-  useEffect(() => {
-    const fetchDailyMatch = async () => {
-      const { data, error } = await supabase.rpc('get_or_create_daily_match');
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      setNoMatch(false);
 
-      if (error || !data || data.length === 0) {
-        setNoMatch(true);
+      supabase.rpc('get_or_create_daily_match').then(({ data, error }) => {
+        if (error || !data || data.length === 0) {
+          setNoMatch(true);
+          setLoading(false);
+          return;
+        }
+
+        const row = data[0];
+        setMatch({
+          nickname: row.nickname,
+          gender: row.gender,
+          birth_year: row.birth_year,
+          company_name: row.company_name,
+        });
         setLoading(false);
-        return;
-      }
-
-      const row = data[0];
-      setMatch({
-        nickname: row.nickname,
-        gender: row.gender,
-        birth_year: row.birth_year,
-        company_name: row.company_name,
       });
-      setLoading(false);
-    };
-
-    fetchDailyMatch();
-  }, []);
+    }, [])
+  );
 
   if (loading) {
     return (
