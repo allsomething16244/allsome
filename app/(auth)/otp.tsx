@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 
 export default function OtpScreen() {
-  const { email, company_id } = useLocalSearchParams<{ email: string; company_id: string }>();
+  const { email } = useLocalSearchParams<{ email: string }>();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -29,7 +29,7 @@ export default function OtpScreen() {
             apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
             Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ email, code: otp, company_id: company_id ? Number(company_id) : null }),
+          body: JSON.stringify({ email, code: otp }),
         },
       );
 
