@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -14,14 +14,19 @@ interface Message {
   created_at: string;
 }
 
+const PAGE_SIZE = 50;
+
 export default function ChatRoomScreen() {
   const { id: roomId } = useLocalSearchParams<{ id: string }>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList>(null);
+  const oldestCreatedAt = useRef<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -29,13 +34,18 @@ export default function ChatRoomScreen() {
       if (!user) return;
       setUserId(user.id);
 
+      // 최신 PAGE_SIZE개만 로드
       const { data } = await supabase
         .from('messages')
         .select('id, sender_id, content, created_at')
         .eq('room_id', roomId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE);
 
-      setMessages(data ?? []);
+      const rows = (data ?? []).reverse();
+      setMessages(rows);
+      if (rows.length > 0) oldestCreatedAt.current = rows[0].created_at;
+      setHasMore((data ?? []).length === PAGE_SIZE);
       setLoading(false);
     };
 
@@ -56,11 +66,34 @@ export default function ChatRoomScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [roomId]);
 
+  // 새 메시지 오면 맨 아래로
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && !loadingMore) {
       listRef.current?.scrollToEnd({ animated: true });
     }
   }, [messages]);
+
+  // 위로 스크롤 시 이전 메시지 로드
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !oldestCreatedAt.current) return;
+    setLoadingMore(true);
+
+    const { data } = await supabase
+      .from('messages')
+      .select('id, sender_id, content, created_at')
+      .eq('room_id', roomId)
+      .lt('created_at', oldestCreatedAt.current)
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE);
+
+    const rows = (data ?? []).reverse();
+    if (rows.length > 0) {
+      oldestCreatedAt.current = rows[0].created_at;
+      setMessages(prev => [...rows, ...prev]);
+    }
+    setHasMore(rows.length === PAGE_SIZE);
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, roomId]);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -104,6 +137,11 @@ export default function ChatRoomScreen() {
         data={messages}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.messageList}
+        onStartReached={loadMore}
+        onStartReachedThreshold={0.2}
+        ListHeaderComponent={
+          loadingMore ? <ActivityIndicator color={Colors.primary} style={styles.loadingMore} /> : null
+        }
         renderItem={({ item }) => {
           const isMine = item.sender_id === userId;
           return (
@@ -152,6 +190,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: 22, color: Colors.primary },
   headerTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
   messageList: { padding: 16, gap: 8 },
+  loadingMore: { paddingVertical: 12 },
   bubble: {
     maxWidth: '75%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10,
   },
