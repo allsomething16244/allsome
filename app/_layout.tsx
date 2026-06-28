@@ -2,13 +2,34 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Session } from '@supabase/supabase-js';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [initialized, setInitialized] = useState(false);
   const appState = useRef(AppState.currentState);
   const hasRouted = useRef(false);
+
+  usePushNotifications(session?.user.id ?? null);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(() => {
+      router.push('/(tabs)/chat');
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

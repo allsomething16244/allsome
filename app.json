@@ -32,7 +32,21 @@
         {
           "faceIDPermission": "생체 인증을 사용해 로그인합니다."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FF6B6B"
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "abbf1127-9f2d-49f9-9f89-32f483b36572"
+      }
+    },
+    "owner": "allsomething"
   }
 }

@@ -116,6 +116,10 @@ export default function HomeScreen() {
         return;
       }
       setRequest({ status: 'pending_sent', requestId: requestId as string, roomId: null });
+
+      supabase.functions.invoke('notify-chat-request', {
+        body: { to_user_id: match.matchUserId },
+      }).catch((e) => console.warn('push notification failed:', e));
     } finally {
       setRequesting(false);
     }
