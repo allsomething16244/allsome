@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 
 export default function OtpScreen() {
-  const { email } = useLocalSearchParams<{ email: string }>();
+  const { email, company_id } = useLocalSearchParams<{ email: string; company_id: string }>();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -29,7 +29,7 @@ export default function OtpScreen() {
             apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
             Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ email, code: otp }),
+          body: JSON.stringify({ email, code: otp, company_id: company_id ? Number(company_id) : null }),
         },
       );
 
@@ -50,7 +50,7 @@ export default function OtpScreen() {
         return;
       }
 
-      // _layout.tsx의 onAuthStateChange가 감지해서 자동으로 홈으로 이동
+      router.replace('/(auth)/onboarding');
     } catch {
       Alert.alert('오류가 발생했습니다. 다시 시도해주세요.');
     } finally {

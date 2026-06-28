@@ -121,7 +121,10 @@ export default function LoginScreen() {
         return;
       }
 
-      router.push({ pathname: '/(auth)/otp', params: { email } });
+      router.push({
+        pathname: '/(auth)/otp',
+        params: { email, company_id: String(selectedCompany.id) },
+      });
     } catch {
       Alert.alert('오류가 발생했습니다. 다시 시도해주세요.');
     } finally {

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__supabase__list_tables",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__get_project_url",
+      "Read(//Users/hmc7353517/.claude/**)",
+      "Read(//Users/hmc7353517/.config/claude/**)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if ''''mcp'''' in k.lower\\(\\) or ''''supabase'''' in k.lower\\(\\)}, indent=2\\)\\)\")",
+      "mcp__supabase__execute_sql",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "mcp__supabase__get_logs",
+      "Bash(npx supabase:*)",
+      "mcp__supabase__deploy_edge_function",
+      "Bash(git restore:*)",
+      "mcp__notion-api__API-post-search",
+      "mcp__notion-api__API-retrieve-page-markdown",
+      "mcp__notion-api__API-update-page-markdown",
+      "mcp__notion-api__API-post-page",
+      "mcp__supabase__get_edge_function"
+    ]
+  }
+}
