@@ -100,19 +100,21 @@ export default function HomeScreen() {
     if (!match) return;
     setRequesting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase.from('chat_requests').insert({
-        from_user_id: user.id,
-        to_user_id: match.matchUserId,
+      const { data: requestId, error } = await supabase.rpc('send_chat_request', {
+        p_to_user_id: match.matchUserId,
       });
 
       if (error) {
-        Alert.alert('오류가 발생했습니다. 다시 시도해주세요.');
+        if (error.message.includes('NOT_TODAY_MATCH')) {
+          Alert.alert('오늘의 추천 상대에게만 채팅을 신청할 수 있어요.');
+        } else if (error.message.includes('ALREADY_EXISTS')) {
+          Alert.alert('이미 채팅 신청이 있거나 채팅방이 존재해요.');
+        } else {
+          Alert.alert('오류가 발생했습니다. 다시 시도해주세요.');
+        }
         return;
       }
-      setRequest({ status: 'pending_sent', requestId: null, roomId: null });
+      setRequest({ status: 'pending_sent', requestId: requestId as string, roomId: null });
     } finally {
       setRequesting(false);
     }
