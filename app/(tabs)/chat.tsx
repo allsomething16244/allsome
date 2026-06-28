@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useFocusEffect, router } from 'expo-router';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -15,6 +15,13 @@ interface PendingRequest {
   requested_at: string;
 }
 
+interface SentRequest {
+  request_id: string;
+  to_nickname: string;
+  to_company_name: string | null;
+  requested_at: string;
+}
+
 interface ChatRoom {
   room_id: string;
   partner_user_id: string;
@@ -26,19 +33,40 @@ interface ChatRoom {
 
 export default function ChatScreen() {
   const [requests, setRequests] = useState<PendingRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<SentRequest[]>([]);
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatRemaining = (requestedAt: string) => {
+    const expiresAt = new Date(requestedAt).getTime() + 24 * 60 * 60 * 1000;
+    const diff = expiresAt - now;
+    if (diff <= 0) return '만료됨';
+    const h = Math.floor(diff / (1000 * 60 * 60));
+    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const s = Math.floor((diff % (1000 * 60)) / 1000);
+    if (h > 0) return `${h}시간 ${m}분 ${s}초 남음`;
+    if (m > 0) return `${m}분 ${s}초 남음`;
+    return `${s}초 남음`;
+  };
 
   useFocusEffect(
     useCallback(() => {
       const fetchAll = async () => {
         setLoading(true);
-        const [{ data: reqData }, { data: roomData }] = await Promise.all([
+        const [{ data: reqData }, { data: roomData }, { data: sentData }] = await Promise.all([
           supabase.rpc('get_pending_requests'),
           supabase.rpc('get_my_chat_rooms'),
+          supabase.rpc('get_sent_requests'),
         ]);
         setRequests(reqData ?? []);
         setRooms(roomData ?? []);
+        setSentRequests(sentData ?? []);
         setLoading(false);
       };
       fetchAll();
@@ -72,7 +100,7 @@ export default function ChatScreen() {
     );
   }
 
-  const isEmpty = requests.length === 0 && rooms.length === 0;
+  const isEmpty = requests.length === 0 && sentRequests.length === 0 && rooms.length === 0;
 
   return (
     <View style={styles.container}>
@@ -88,6 +116,29 @@ export default function ChatScreen() {
           renderItem={null}
           ListHeaderComponent={
             <>
+              {sentRequests.length > 0 && (
+                <>
+                  <Text style={styles.sectionTitle}>보낸 신청</Text>
+                  {sentRequests.map(req => (
+                    <View key={req.request_id} style={styles.requestCard}>
+                      <View style={styles.avatarSmall}>
+                        <Text style={styles.avatarSmallText}>{req.to_nickname[0]}</Text>
+                      </View>
+                      <View style={styles.requestInfo}>
+                        <Text style={styles.requestNickname}>{req.to_nickname}</Text>
+                        {req.to_company_name && (
+                          <Text style={styles.requestCompany}>{req.to_company_name}</Text>
+                        )}
+                      </View>
+                      <View style={styles.pendingBadge}>
+                        <Text style={styles.pendingBadgeText}>대기중</Text>
+                        <Text style={styles.remainingText}>{formatRemaining(req.requested_at)}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </>
+              )}
+
               {requests.length > 0 && (
                 <>
                   <Text style={styles.sectionTitle}>받은 신청</Text>
@@ -103,6 +154,7 @@ export default function ChatScreen() {
                         )}
                       </View>
                       <View style={styles.requestActions}>
+                        <Text style={styles.remainingText}>{formatRemaining(req.requested_at)}</Text>
                         <TouchableOpacity
                           style={styles.rejectButton}
                           onPress={() => handleReject(req.request_id)}
@@ -187,6 +239,11 @@ const styles = StyleSheet.create({
     borderRadius: 8, backgroundColor: Colors.primary,
   },
   acceptText: { fontSize: 13, color: '#fff', fontWeight: '600' },
+  pendingBadge: {
+    alignItems: 'flex-end', gap: 2,
+  },
+  pendingBadgeText: { fontSize: 12, color: Colors.textSecondary },
+  remainingText: { fontSize: 11, color: Colors.primary },
   roomCard: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 14,
