@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
@@ -20,10 +21,21 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      setNoMatch(false);
+      const CACHE_KEY = 'daily_match_cache';
+      const today = new Date().toDateString();
 
-      supabase.rpc('get_or_create_daily_match').then(({ data, error }) => {
+      const fetchDailyMatch = async () => {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { date, data } = JSON.parse(cached);
+          if (date === today) {
+            setMatch(data);
+            setLoading(false);
+            return;
+          }
+        }
+
+        const { data, error } = await supabase.rpc('get_or_create_daily_match');
         if (error || !data || data.length === 0) {
           setNoMatch(true);
           setLoading(false);
@@ -31,14 +43,18 @@ export default function HomeScreen() {
         }
 
         const row = data[0];
-        setMatch({
+        const matchData: MatchProfile = {
           nickname: row.nickname,
           gender: row.gender,
           birth_year: row.birth_year,
           company_name: row.company_name,
-        });
+        };
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ date: today, data: matchData }));
+        setMatch(matchData);
         setLoading(false);
-      });
+      };
+
+      fetchDailyMatch();
     }, [])
   );
 
