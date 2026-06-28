@@ -19,46 +19,20 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const fetchDailyMatch = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data, error } = await supabase.rpc('get_or_create_daily_match');
 
-      // 오늘의 매칭 ID 조회 or 생성
-      const { data: matchId, error } = await supabase.rpc('get_or_create_daily_match');
-
-      if (error || !matchId) {
+      if (error || !data || data.length === 0) {
         setNoMatch(true);
         setLoading(false);
         return;
       }
 
-      // 매칭된 프로필 조회
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('nickname, gender, birth_year, company_id')
-        .eq('id', matchId)
-        .single();
-
-      if (!profile) {
-        setNoMatch(true);
-        setLoading(false);
-        return;
-      }
-
-      let companyName: string | null = null;
-      if (profile.company_id) {
-        const { data: company } = await supabase
-          .from('companies')
-          .select('name')
-          .eq('id', profile.company_id)
-          .single();
-        companyName = company?.name ?? null;
-      }
-
+      const row = data[0];
       setMatch({
-        nickname: profile.nickname,
-        gender: profile.gender,
-        birth_year: profile.birth_year,
-        company_name: companyName,
+        nickname: row.nickname,
+        gender: row.gender,
+        birth_year: row.birth_year,
+        company_name: row.company_name,
       });
       setLoading(false);
     };
