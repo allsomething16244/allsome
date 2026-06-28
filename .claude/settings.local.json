@@ -19,7 +19,8 @@
       "mcp__notion-api__API-retrieve-page-markdown",
       "mcp__notion-api__API-update-page-markdown",
       "mcp__notion-api__API-post-page",
-      "mcp__supabase__get_edge_function"
+      "mcp__supabase__get_edge_function",
+      "mcp__notion-api__API-get-self"
     ]
   }
 }

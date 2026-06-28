@@ -8,20 +8,23 @@ export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [initialized, setInitialized] = useState(false);
   const appState = useRef(AppState.currentState);
+  const hasRouted = useRef(false);
 
   useEffect(() => {
-    // 앱 시작 시 저장된 세션 복원
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setInitialized(true);
     });
 
-    // 로그인/로그아웃 상태 변경 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        hasRouted.current = false;
+        setSession(null);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSession(session);
+      }
     });
 
-    // 포그라운드/백그라운드 전환 시 토큰 자동 갱신 제어 (Supabase React Native 권장 패턴)
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
         supabase.auth.startAutoRefresh();
@@ -41,16 +44,23 @@ export default function RootLayout() {
     if (!initialized) return;
 
     if (session) {
+      // 이미 라우팅한 상태면 토큰 갱신 등으로 재실행돼도 다시 라우팅하지 않음
+      if (hasRouted.current) return;
+      hasRouted.current = true;
+
       supabase
         .from('profiles')
         .select('nickname')
         .eq('id', session.user.id)
-        .single()
-        .then(async ({ data, error }) => {
+        .maybeSingle()
+        .then(({ data, error }) => {
           if (error) {
-            await supabase.auth.signOut();
+            // 쿼리 에러(네트워크 등) → 로그인으로, signOut은 하지 않음
+            hasRouted.current = false;
             router.replace('/(auth)/login');
-          } else if (!data?.nickname) {
+            return;
+          }
+          if (!data?.nickname) {
             router.replace('/(auth)/onboarding');
           } else {
             router.replace('/(tabs)/home');

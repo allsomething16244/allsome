@@ -50,7 +50,7 @@ export default function OtpScreen() {
         return;
       }
 
-      router.replace('/(auth)/onboarding');
+      // 라우팅은 _layout.tsx의 onAuthStateChange → 프로필 조회 결과에 따라 처리
     } catch {
       Alert.alert('오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
