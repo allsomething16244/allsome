@@ -4,6 +4,7 @@ import {
   StyleSheet, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 
 export default function OtpScreen() {
@@ -19,8 +20,39 @@ export default function OtpScreen() {
 
     setLoading(true);
     try {
-      // TODO: Edge Function verify-otp 호출
-      Alert.alert('준비 중', 'OTP 검증 기능은 곧 추가됩니다.');
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+            Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ email, code: otp }),
+        },
+      );
+
+      const result = await res.json();
+      if (!res.ok) {
+        Alert.alert(result.error ?? '오류가 발생했습니다. 다시 시도해주세요.');
+        return;
+      }
+
+      // hashed_token으로 세션 발급
+      const { error: sessionError } = await supabase.auth.verifyOtp({
+        token_hash: result.hashed_token,
+        type: 'magiclink',
+      });
+
+      if (sessionError) {
+        Alert.alert('로그인에 실패했습니다. 다시 시도해주세요.');
+        return;
+      }
+
+      // _layout.tsx의 onAuthStateChange가 감지해서 자동으로 홈으로 이동
+    } catch {
+      Alert.alert('오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
@@ -48,12 +80,13 @@ export default function OtpScreen() {
           keyboardType="number-pad"
           maxLength={6}
           textAlign="center"
+          autoFocus
         />
 
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[styles.button, (otp.length !== 6 || loading) && styles.buttonDisabled]}
           onPress={handleVerify}
-          disabled={loading}
+          disabled={otp.length !== 6 || loading}
         >
           <Text style={styles.buttonText}>
             {loading ? '확인 중...' : '확인'}
@@ -114,7 +147,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.4,
   },
   buttonText: {
     color: '#FFFFFF',

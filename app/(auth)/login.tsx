@@ -101,8 +101,26 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const email = `${prefix}@${selectedDomain!.domain}`;
-      // TODO: Edge Function send-otp 호출
-      Alert.alert('준비 중', 'OTP 발송 기능은 곧 추가됩니다.');
+
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+            Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ email }),
+        },
+      );
+
+      const result = await res.json();
+      if (!res.ok) {
+        Alert.alert(result.error ?? '오류가 발생했습니다. 다시 시도해주세요.');
+        return;
+      }
+
       router.push({ pathname: '/(auth)/otp', params: { email } });
     } catch {
       Alert.alert('오류가 발생했습니다. 다시 시도해주세요.');
