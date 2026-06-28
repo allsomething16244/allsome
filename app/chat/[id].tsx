@@ -18,6 +18,7 @@ const PAGE_SIZE = 50;
 
 export default function ChatRoomScreen() {
   const { id: roomId } = useLocalSearchParams<{ id: string }>();
+  // inverted FlatList: 배열 앞쪽 = 최신 메시지
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
@@ -25,7 +26,6 @@ export default function ChatRoomScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
-  const listRef = useRef<FlatList>(null);
   const oldestCreatedAt = useRef<string | null>(null);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function ChatRoomScreen() {
       if (!user) return;
       setUserId(user.id);
 
-      // 최신 PAGE_SIZE개만 로드
+      // 최신 PAGE_SIZE개 (내림차순 → inverted FlatList와 맞음)
       const { data } = await supabase
         .from('messages')
         .select('id, sender_id, content, created_at')
@@ -42,23 +42,23 @@ export default function ChatRoomScreen() {
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
 
-      const rows = (data ?? []).reverse();
+      const rows = data ?? [];
       setMessages(rows);
-      if (rows.length > 0) oldestCreatedAt.current = rows[0].created_at;
-      setHasMore((data ?? []).length === PAGE_SIZE);
+      if (rows.length > 0) oldestCreatedAt.current = rows[rows.length - 1].created_at;
+      setHasMore(rows.length === PAGE_SIZE);
       setLoading(false);
     };
 
     init();
 
-    // Realtime 구독
     const channel = supabase
       .channel(`room:${roomId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as Message]);
+          // 새 메시지 → 배열 앞에 추가 (inverted에서 맨 아래 표시)
+          setMessages(prev => [payload.new as Message, ...prev]);
         }
       )
       .subscribe();
@@ -66,14 +66,7 @@ export default function ChatRoomScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [roomId]);
 
-  // 새 메시지 오면 맨 아래로
-  useEffect(() => {
-    if (messages.length > 0 && !loadingMore) {
-      listRef.current?.scrollToEnd({ animated: true });
-    }
-  }, [messages]);
-
-  // 위로 스크롤 시 이전 메시지 로드
+  // 위로 스크롤 시 (inverted에서는 onEndReached) 이전 메시지 로드
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !oldestCreatedAt.current) return;
     setLoadingMore(true);
@@ -86,10 +79,10 @@ export default function ChatRoomScreen() {
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE);
 
-    const rows = (data ?? []).reverse();
+    const rows = data ?? [];
     if (rows.length > 0) {
-      oldestCreatedAt.current = rows[0].created_at;
-      setMessages(prev => [...rows, ...prev]);
+      oldestCreatedAt.current = rows[rows.length - 1].created_at;
+      setMessages(prev => [...prev, ...rows]);
     }
     setHasMore(rows.length === PAGE_SIZE);
     setLoadingMore(false);
@@ -123,7 +116,6 @@ export default function ChatRoomScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      {/* 헤더 */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>←</Text>
@@ -131,15 +123,14 @@ export default function ChatRoomScreen() {
         <Text style={styles.headerTitle}>채팅</Text>
       </View>
 
-      {/* 메시지 목록 */}
       <FlatList
-        ref={listRef}
         data={messages}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.messageList}
-        onStartReached={loadMore}
-        onStartReachedThreshold={0.2}
-        ListHeaderComponent={
+        inverted
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
           loadingMore ? <ActivityIndicator color={Colors.primary} style={styles.loadingMore} /> : null
         }
         renderItem={({ item }) => {
@@ -154,7 +145,6 @@ export default function ChatRoomScreen() {
         }}
       />
 
-      {/* 입력창 */}
       <View style={styles.inputBar}>
         <TextInput
           style={styles.input}
