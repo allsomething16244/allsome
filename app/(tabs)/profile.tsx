@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, TextInput } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 
@@ -110,9 +110,9 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       {/* 아바타 */}
       <View style={styles.avatarCircle}>
-        <Ionicons
-          name={profile?.gender === 'F' ? 'woman' : 'man'}
-          size={52}
+        <MaterialCommunityIcons
+          name="account-circle"
+          size={80}
           color={profile?.gender === 'F' ? Colors.primary : '#4A90E2'}
         />
       </View>

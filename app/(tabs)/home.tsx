@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useFocusEffect, router } from 'expo-router';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 
@@ -158,9 +158,9 @@ export default function HomeScreen() {
 
       <View style={styles.card}>
         <View style={styles.avatarCircle}>
-          <Ionicons
-            name={match.gender === 'F' ? 'woman' : 'man'}
-            size={52}
+          <MaterialCommunityIcons
+            name="account-circle"
+            size={80}
             color={match.gender === 'F' ? Colors.primary : '#4A90E2'}
           />
         </View>
