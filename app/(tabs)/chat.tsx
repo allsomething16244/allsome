@@ -63,7 +63,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('chat-list-messages')
+      .channel(`chat-list-messages-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
