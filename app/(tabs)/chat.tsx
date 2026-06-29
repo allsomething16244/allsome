@@ -12,6 +12,7 @@ interface PendingRequest {
   from_user_id: string;
   from_nickname: string;
   from_company_name: string | null;
+  from_birth_year: number | null;
   requested_at: string;
 }
 
@@ -19,6 +20,7 @@ interface SentRequest {
   request_id: string;
   to_nickname: string;
   to_company_name: string | null;
+  to_birth_year: number | null;
   requested_at: string;
 }
 
@@ -135,7 +137,9 @@ export default function ChatScreen() {
                         <Text style={styles.avatarSmallText}>{req.to_nickname[0]}</Text>
                       </View>
                       <View style={styles.requestInfo}>
-                        <Text style={styles.requestNickname}>{req.to_nickname}</Text>
+                        <Text style={styles.requestNickname}>
+                          {req.to_nickname}{req.to_birth_year ? ` · ${new Date().getFullYear() - req.to_birth_year}세` : ''}
+                        </Text>
                         {req.to_company_name && (
                           <Text style={styles.requestCompany}>{req.to_company_name}</Text>
                         )}
@@ -158,7 +162,9 @@ export default function ChatScreen() {
                         <Text style={styles.avatarSmallText}>{req.from_nickname[0]}</Text>
                       </View>
                       <View style={styles.requestInfo}>
-                        <Text style={styles.requestNickname}>{req.from_nickname}</Text>
+                        <Text style={styles.requestNickname}>
+                          {req.from_nickname}{req.from_birth_year ? ` · ${new Date().getFullYear() - req.from_birth_year}세` : ''}
+                        </Text>
                         {req.from_company_name && (
                           <Text style={styles.requestCompany}>{req.from_company_name}</Text>
                         )}
