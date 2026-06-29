@@ -60,6 +60,24 @@ export default function ChatScreen() {
     return () => clearInterval(timer);
   }, []);
 
+  const formatMessageTime = (isoString: string) => {
+    const date = new Date(isoString);
+    const today = new Date();
+    const isToday = date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate();
+    if (isToday) {
+      return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const isYesterday = date.getFullYear() === yesterday.getFullYear() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getDate() === yesterday.getDate();
+    if (isYesterday) return '어제';
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  };
+
   const formatRemaining = (requestedAt: string) => {
     const expiresAt = new Date(requestedAt).getTime() + 24 * 60 * 60 * 1000;
     const diff = expiresAt - now;
@@ -231,9 +249,14 @@ export default function ChatScreen() {
                         {room.partner_company_name && (
                           <Text style={styles.roomCompany}>{room.partner_company_name}</Text>
                         )}
-                        <Text style={styles.lastMessage} numberOfLines={1}>
-                          {room.last_message ?? '대화를 시작해보세요'}
-                        </Text>
+                        <View style={styles.lastMessageRow}>
+                          <Text style={styles.lastMessage} numberOfLines={1}>
+                            {room.last_message ?? '대화를 시작해보세요'}
+                          </Text>
+                          {room.last_message_at && (
+                            <Text style={styles.messageTime}>{formatMessageTime(room.last_message_at)}</Text>
+                          )}
+                        </View>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -295,5 +318,7 @@ const styles = StyleSheet.create({
   roomInfo: { flex: 1 },
   roomNickname: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 2 },
   roomCompany: { fontSize: 13, color: Colors.textSecondary, marginBottom: 2 },
-  lastMessage: { fontSize: 13, color: Colors.textSecondary },
+  lastMessageRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  lastMessage: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
+  messageTime: { fontSize: 11, color: Colors.textSecondary, flexShrink: 0 },
 });
