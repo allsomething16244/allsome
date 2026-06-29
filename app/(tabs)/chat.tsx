@@ -234,14 +234,16 @@ export default function ChatScreen() {
                       <View style={styles.requestActions}>
                         <Text style={styles.remainingText}>{formatRemaining(req.requested_at)}</Text>
                         <TouchableOpacity
-                          style={styles.rejectButton}
+                          style={[styles.rejectButton, formatRemaining(req.requested_at) === '만료됨' && styles.buttonDisabled]}
                           onPress={() => handleReject(req.request_id)}
+                          disabled={formatRemaining(req.requested_at) === '만료됨'}
                         >
                           <Text style={styles.rejectText}>거절</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={styles.acceptButton}
+                          style={[styles.acceptButton, formatRemaining(req.requested_at) === '만료됨' && styles.buttonDisabled]}
                           onPress={() => handleAccept(req.request_id)}
+                          disabled={formatRemaining(req.requested_at) === '만료됨'}
                         >
                           <Text style={styles.acceptText}>수락</Text>
                         </TouchableOpacity>
@@ -326,6 +328,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 7,
     borderRadius: 8, backgroundColor: Colors.primary,
   },
+  buttonDisabled: { backgroundColor: Colors.border, borderColor: Colors.border, opacity: 0.5 },
   acceptText: { fontSize: 13, color: '#fff', fontWeight: '600' },
   pendingBadge: {
     alignItems: 'flex-end', gap: 2,
