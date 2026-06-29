@@ -29,6 +29,7 @@ interface PendingRequest {
 
 interface SentRequest {
   request_id: string;
+  to_user_id: string;
   to_nickname: string;
   to_company_name: string | null;
   to_birth_year: number | null;
@@ -147,15 +148,20 @@ export default function ChatScreen() {
                   <Text style={styles.sectionTitle}>보낸 신청</Text>
                   {sentRequests.map(req => (
                     <View key={req.request_id} style={styles.requestCard}>
-                      <GenderAvatar gender={req.to_gender} />
-                      <View style={styles.requestInfo}>
-                        <Text style={styles.requestNickname}>
-                          {req.to_nickname}{req.to_birth_year ? ` · ${new Date().getFullYear() - req.to_birth_year}세` : ''}
-                        </Text>
-                        {req.to_company_name && (
-                          <Text style={styles.requestCompany}>{req.to_company_name}</Text>
-                        )}
-                      </View>
+                      <TouchableOpacity
+                        style={styles.profileTouchable}
+                        onPress={() => router.push({ pathname: '/profile/[id]', params: { id: req.to_user_id } })}
+                      >
+                        <GenderAvatar gender={req.to_gender} />
+                        <View style={styles.requestInfo}>
+                          <Text style={styles.requestNickname}>
+                            {req.to_nickname}{req.to_birth_year ? ` · ${new Date().getFullYear() - req.to_birth_year}세` : ''}
+                          </Text>
+                          {req.to_company_name && (
+                            <Text style={styles.requestCompany}>{req.to_company_name}</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
                       <View style={styles.pendingBadge}>
                         <Text style={styles.pendingBadgeText}>대기중</Text>
                         <Text style={styles.remainingText}>{formatRemaining(req.requested_at)}</Text>
@@ -170,15 +176,20 @@ export default function ChatScreen() {
                   <Text style={styles.sectionTitle}>받은 신청</Text>
                   {requests.map(req => (
                     <View key={req.request_id} style={styles.requestCard}>
-                      <GenderAvatar gender={req.from_gender} />
-                      <View style={styles.requestInfo}>
-                        <Text style={styles.requestNickname}>
-                          {req.from_nickname}{req.from_birth_year ? ` · ${new Date().getFullYear() - req.from_birth_year}세` : ''}
-                        </Text>
-                        {req.from_company_name && (
-                          <Text style={styles.requestCompany}>{req.from_company_name}</Text>
-                        )}
-                      </View>
+                      <TouchableOpacity
+                        style={styles.profileTouchable}
+                        onPress={() => router.push({ pathname: '/profile/[id]', params: { id: req.from_user_id } })}
+                      >
+                        <GenderAvatar gender={req.from_gender} />
+                        <View style={styles.requestInfo}>
+                          <Text style={styles.requestNickname}>
+                            {req.from_nickname}{req.from_birth_year ? ` · ${new Date().getFullYear() - req.from_birth_year}세` : ''}
+                          </Text>
+                          {req.from_company_name && (
+                            <Text style={styles.requestCompany}>{req.from_company_name}</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
                       <View style={styles.requestActions}>
                         <Text style={styles.remainingText}>{formatRemaining(req.requested_at)}</Text>
                         <TouchableOpacity
@@ -248,6 +259,7 @@ const styles = StyleSheet.create({
   avatarSmall: {
     marginRight: 12,
   },
+  profileTouchable: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   requestInfo: { flex: 1 },
   requestNickname: { fontSize: 15, fontWeight: '600', color: Colors.text },
   requestCompany: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
