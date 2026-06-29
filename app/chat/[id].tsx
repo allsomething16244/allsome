@@ -25,6 +25,7 @@ interface Partner {
   partner_gender: string | null;
   partner_last_read_at: string | null;
   partner_left: boolean;
+  my_visible_from: string | null;
 }
 
 const PAGE_SIZE = 50;
@@ -41,6 +42,7 @@ export default function ChatRoomScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
   const [partnerLeft, setPartnerLeft] = useState(false);
+  const [myVisibleFrom, setMyVisibleFrom] = useState<string | null>(null);
   const oldestCreatedAt = useRef<string | null>(null);
   const partnerUserIdRef = useRef<string | null>(null);
   const userIdRef = useRef<string | null>(null);
@@ -62,6 +64,7 @@ export default function ChatRoomScreen() {
         setPartner(partnerData[0]);
         setPartnerLastReadAt(partnerData[0].partner_last_read_at ?? null);
         setPartnerLeft(partnerData[0].partner_left ?? false);
+        setMyVisibleFrom(partnerData[0].my_visible_from ?? null);
         partnerUserIdRef.current = partnerData[0].partner_user_id;
       }
 
@@ -69,12 +72,15 @@ export default function ChatRoomScreen() {
       await supabase.rpc('mark_messages_read', { p_room_id: roomId });
 
       // 최신 PAGE_SIZE개 (내림차순 → inverted FlatList와 맞음)
-      const { data } = await supabase
+      const visibleFrom = partnerData?.[0]?.my_visible_from ?? null;
+      let msgQuery = supabase
         .from('messages')
         .select('id, sender_id, content, created_at, type')
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
+      if (visibleFrom) msgQuery = msgQuery.gte('created_at', visibleFrom);
+      const { data } = await msgQuery;
 
       const rows = data ?? [];
       setMessages(rows);
@@ -136,13 +142,15 @@ export default function ChatRoomScreen() {
     if (loadingMore || !hasMore || !oldestCreatedAt.current) return;
     setLoadingMore(true);
 
-    const { data } = await supabase
+    let moreQuery = supabase
       .from('messages')
       .select('id, sender_id, content, created_at, type')
       .eq('room_id', roomId)
       .lt('created_at', oldestCreatedAt.current)
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE);
+    if (myVisibleFrom) moreQuery = moreQuery.gte('created_at', myVisibleFrom);
+    const { data } = await moreQuery;
 
     const rows = data ?? [];
     if (rows.length > 0) {
@@ -151,7 +159,7 @@ export default function ChatRoomScreen() {
     }
     setHasMore(rows.length === PAGE_SIZE);
     setLoadingMore(false);
-  }, [loadingMore, hasMore, roomId]);
+  }, [loadingMore, hasMore, roomId, myVisibleFrom]);
 
   const handleLeave = () => {
     Alert.alert('채팅방 나가기', '채팅방을 나가면 대화 내용을 볼 수 없어요. 나가시겠어요?', [
@@ -239,7 +247,11 @@ export default function ChatRoomScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.3}
         ListFooterComponent={
-          loadingMore ? <ActivityIndicator color={Colors.primary} style={styles.loadingMore} /> : null
+          loadingMore
+            ? <ActivityIndicator color={Colors.primary} style={styles.loadingMore} />
+            : myVisibleFrom
+              ? <View style={styles.visibleFromNotice}><Text style={styles.visibleFromText}>이전 대화 내용은 볼 수 없습니다</Text></View>
+              : null
         }
         renderItem={({ item }) => {
           if (item.type === 'system') {
@@ -345,6 +357,8 @@ const styles = StyleSheet.create({
   sendButtonDisabled: { backgroundColor: Colors.border },
   sendText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   leaveButton: { padding: 6, marginLeft: 4 },
+  visibleFromNotice: { alignItems: 'center', paddingVertical: 16 },
+  visibleFromText: { fontSize: 12, color: Colors.textSecondary },
   systemRow: { alignItems: 'center', marginVertical: 4 },
   systemText: { fontSize: 12, color: Colors.textSecondary, backgroundColor: Colors.border, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, overflow: 'hidden' },
   leftNotice: {
