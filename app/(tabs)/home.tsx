@@ -85,8 +85,19 @@ export default function HomeScreen() {
 
           if (!reqData) {
             setRequest({ status: 'none', requestId: null, roomId: null });
-          } else if (reqData.status === 'accepted') {
-            setRequest({ status: 'accepted', requestId: reqData.id, roomId: reqData.room_id });
+          } else if (reqData.status === 'accepted' && reqData.room_id) {
+            // 내가 실제로 방에 남아있는지 확인 (나가기 후 chat_requests 미동기화 방어)
+            const { data: myMember } = await supabase
+              .from('chat_room_members')
+              .select('left_at')
+              .eq('room_id', reqData.room_id)
+              .eq('user_id', user.id)
+              .maybeSingle();
+            if (myMember && myMember.left_at === null) {
+              setRequest({ status: 'accepted', requestId: reqData.id, roomId: reqData.room_id });
+            } else {
+              setRequest({ status: 'none', requestId: null, roomId: null });
+            }
           } else if (reqData.status === 'pending' && !isExpired && reqData.from_user_id === user.id) {
             setRequest({ status: 'pending_sent', requestId: reqData.id, roomId: null });
           } else if (reqData.status === 'pending' && !isExpired && reqData.from_user_id !== user.id) {
