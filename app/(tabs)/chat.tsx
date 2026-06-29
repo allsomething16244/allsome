@@ -219,11 +219,18 @@ export default function ChatScreen() {
                       style={styles.roomCard}
                       onPress={() => router.push({ pathname: '/chat/[id]', params: { id: room.room_id } })}
                     >
-                      <GenderAvatar gender={room.partner_gender} />
+                      <TouchableOpacity
+                        onPress={() => router.push({ pathname: '/profile/[id]', params: { id: room.partner_user_id } })}
+                      >
+                        <GenderAvatar gender={room.partner_gender} />
+                      </TouchableOpacity>
                       <View style={styles.roomInfo}>
                         <Text style={styles.roomNickname}>
                           {room.partner_nickname}{room.partner_birth_year ? ` · ${new Date().getFullYear() - room.partner_birth_year}세` : ''}
                         </Text>
+                        {room.partner_company_name && (
+                          <Text style={styles.roomCompany}>{room.partner_company_name}</Text>
+                        )}
                         <Text style={styles.lastMessage} numberOfLines={1}>
                           {room.last_message ?? '대화를 시작해보세요'}
                         </Text>
@@ -286,6 +293,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   roomInfo: { flex: 1 },
-  roomNickname: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 3 },
+  roomNickname: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 2 },
+  roomCompany: { fontSize: 13, color: Colors.textSecondary, marginBottom: 2 },
   lastMessage: { fontSize: 13, color: Colors.textSecondary },
 });
