@@ -4,8 +4,18 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Alert,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
+
+function GenderAvatar({ gender }: { gender: string | null }) {
+  const color = gender === 'F' ? Colors.primary : '#4A90E2';
+  return (
+    <View style={styles.avatarSmall}>
+      <MaterialCommunityIcons name="account-circle" size={44} color={color} />
+    </View>
+  );
+}
 
 interface PendingRequest {
   request_id: string;
@@ -13,6 +23,7 @@ interface PendingRequest {
   from_nickname: string;
   from_company_name: string | null;
   from_birth_year: number | null;
+  from_gender: string | null;
   requested_at: string;
 }
 
@@ -21,6 +32,7 @@ interface SentRequest {
   to_nickname: string;
   to_company_name: string | null;
   to_birth_year: number | null;
+  to_gender: string | null;
   requested_at: string;
 }
 
@@ -30,6 +42,7 @@ interface ChatRoom {
   partner_nickname: string;
   partner_company_name: string | null;
   partner_birth_year: number | null;
+  partner_gender: string | null;
   last_message: string | null;
   last_message_at: string | null;
 }
@@ -134,9 +147,7 @@ export default function ChatScreen() {
                   <Text style={styles.sectionTitle}>보낸 신청</Text>
                   {sentRequests.map(req => (
                     <View key={req.request_id} style={styles.requestCard}>
-                      <View style={styles.avatarSmall}>
-                        <Text style={styles.avatarSmallText}>{req.to_nickname[0]}</Text>
-                      </View>
+                      <GenderAvatar gender={req.to_gender} />
                       <View style={styles.requestInfo}>
                         <Text style={styles.requestNickname}>
                           {req.to_nickname}{req.to_birth_year ? ` · ${new Date().getFullYear() - req.to_birth_year}세` : ''}
@@ -159,9 +170,7 @@ export default function ChatScreen() {
                   <Text style={styles.sectionTitle}>받은 신청</Text>
                   {requests.map(req => (
                     <View key={req.request_id} style={styles.requestCard}>
-                      <View style={styles.avatarSmall}>
-                        <Text style={styles.avatarSmallText}>{req.from_nickname[0]}</Text>
-                      </View>
+                      <GenderAvatar gender={req.from_gender} />
                       <View style={styles.requestInfo}>
                         <Text style={styles.requestNickname}>
                           {req.from_nickname}{req.from_birth_year ? ` · ${new Date().getFullYear() - req.from_birth_year}세` : ''}
@@ -199,9 +208,7 @@ export default function ChatScreen() {
                       style={styles.roomCard}
                       onPress={() => router.push({ pathname: '/chat/[id]', params: { id: room.room_id } })}
                     >
-                      <View style={styles.avatarSmall}>
-                        <Text style={styles.avatarSmallText}>{room.partner_nickname[0]}</Text>
-                      </View>
+                      <GenderAvatar gender={room.partner_gender} />
                       <View style={styles.roomInfo}>
                         <Text style={styles.roomNickname}>
                           {room.partner_nickname}{room.partner_birth_year ? ` · ${new Date().getFullYear() - room.partner_birth_year}세` : ''}
@@ -239,11 +246,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   avatarSmall: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: Colors.primary + '20',
-    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+    marginRight: 12,
   },
-  avatarSmallText: { fontSize: 18, fontWeight: 'bold', color: Colors.primary },
   requestInfo: { flex: 1 },
   requestNickname: { fontSize: 15, fontWeight: '600', color: Colors.text },
   requestCompany: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
