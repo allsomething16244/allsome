@@ -168,6 +168,7 @@ export default function ChatRoomScreen() {
         text: '나가기', style: 'destructive',
         onPress: async () => {
           await supabase.rpc('leave_chat_room', { p_room_id: roomId });
+          supabase.functions.invoke('notify-chat-leave', { body: { room_id: roomId } }).catch(() => {});
           router.back();
         },
       },

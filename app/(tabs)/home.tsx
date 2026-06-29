@@ -83,17 +83,22 @@ export default function HomeScreen() {
             ? new Date(reqData.created_at).getTime() < Date.now() - 24 * 60 * 60 * 1000
             : false;
 
-          if (!reqData) {
-            setRequest({ status: 'none', requestId: null, roomId: null });
-          } else if (reqData.status === 'accepted' && reqData.room_id) {
-            // 내가 실제로 방에 남아있는지 확인 (나가기 후 chat_requests 미동기화 방어)
-            const { data: myMember } = await supabase
+          const checkMemberActive = async (roomId: string) => {
+            const { data } = await supabase
               .from('chat_room_members')
               .select('left_at')
-              .eq('room_id', reqData.room_id)
+              .eq('room_id', roomId)
               .eq('user_id', user.id)
               .maybeSingle();
-            if (myMember && myMember.left_at === null) {
+            return data?.left_at === null;
+          };
+
+          if (!reqData) {
+            setRequest({ status: 'none', requestId: null, roomId: null });
+          } else if ((reqData.status === 'accepted' || reqData.status === 'left') && reqData.room_id) {
+            // 내가 실제로 방에 남아있는지 확인
+            const isActive = await checkMemberActive(reqData.room_id);
+            if (isActive) {
               setRequest({ status: 'accepted', requestId: reqData.id, roomId: reqData.room_id });
             } else {
               setRequest({ status: 'none', requestId: null, roomId: null });
