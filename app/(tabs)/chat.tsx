@@ -275,28 +275,30 @@ export default function ChatScreen() {
                       </TouchableOpacity>
                       <View style={styles.roomInfo}>
                         <View style={styles.roomTopRow}>
-                          <Text style={styles.roomNickname}>
-                            {room.partner_nickname}{room.partner_birth_year ? ` · ${new Date().getFullYear() - room.partner_birth_year}세` : ''}
-                          </Text>
-                          <View style={styles.roomTopRight}>
-                            {room.last_message_at && (
-                              <Text style={styles.messageTime}>{formatMessageTime(room.last_message_at)}</Text>
-                            )}
-                            {room.unread_count > 0 && (
-                              <View style={styles.unreadBadge}>
-                                <Text style={styles.unreadBadgeText}>
-                                  {room.unread_count > 99 ? '99+' : room.unread_count}
-                                </Text>
-                              </View>
+                          <View style={styles.roomNameBlock}>
+                            <Text style={styles.roomNickname} numberOfLines={1}>
+                              {room.partner_nickname}{room.partner_birth_year ? ` · ${new Date().getFullYear() - room.partner_birth_year}세` : ''}
+                            </Text>
+                            {room.partner_company_name && (
+                              <Text style={styles.roomCompany} numberOfLines={1}>{room.partner_company_name}</Text>
                             )}
                           </View>
+                          {room.last_message_at && (
+                            <Text style={styles.messageTime}>{formatMessageTime(room.last_message_at)}</Text>
+                          )}
                         </View>
-                        {room.partner_company_name && (
-                          <Text style={styles.roomCompany}>{room.partner_company_name}</Text>
-                        )}
-                        <Text style={styles.lastMessage} numberOfLines={1}>
-                          {room.last_message ?? '대화를 시작해보세요'}
-                        </Text>
+                        <View style={styles.roomBottomRow}>
+                          <Text style={styles.lastMessage} numberOfLines={1}>
+                            {room.last_message ?? '대화를 시작해보세요'}
+                          </Text>
+                          {room.unread_count > 0 && (
+                            <View style={styles.unreadBadge}>
+                              <Text style={styles.unreadBadgeText}>
+                                {room.unread_count > 99 ? '99+' : room.unread_count}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -357,12 +359,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   roomInfo: { flex: 1 },
-  roomTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  roomTopRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  roomNickname: { fontSize: 15, fontWeight: '600', color: Colors.text, flex: 1 },
-  roomCompany: { fontSize: 13, color: Colors.textSecondary, marginBottom: 2 },
-  lastMessage: { fontSize: 13, color: Colors.textSecondary },
-  messageTime: { fontSize: 11, color: Colors.textSecondary },
+  roomTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 },
+  roomNameBlock: { flex: 1, marginRight: 8 },
+  roomNickname: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 2 },
+  roomCompany: { fontSize: 11, color: Colors.textSecondary, opacity: 0.7 },
+  roomBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  lastMessage: { fontSize: 13, color: Colors.textSecondary, flex: 1, marginRight: 6 },
+  messageTime: { fontSize: 11, color: Colors.textSecondary, flexShrink: 0 },
   unreadBadge: {
     backgroundColor: Colors.primary,
     borderRadius: 10,

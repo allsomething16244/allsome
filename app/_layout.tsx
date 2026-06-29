@@ -9,23 +9,27 @@ import { getActiveRoom } from '../lib/activeRoom';
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    const data = notification.request.content.data ?? {};
-    const recipientUserId = data.recipientUserId as string | undefined;
+    try {
+      const data = notification.request.content.data ?? {};
+      const recipientUserId = data.recipientUserId as string | undefined;
 
-    if (recipientUserId) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session || session.user.id !== recipientUserId) {
+      if (recipientUserId) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session || session.user.id !== recipientUserId) {
+          return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: false, shouldShowList: false };
+        }
+      }
+
+      // 채팅방 안에 있을 때 해당 방 메시지 알림 억제
+      const roomId = data.room_id as string | undefined;
+      if (roomId && getActiveRoom() === roomId) {
         return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: false, shouldShowList: false };
       }
-    }
 
-    // 채팅방 안에 있을 때 해당 방 메시지 알림 억제
-    const roomId = data.room_id as string | undefined;
-    if (roomId && getActiveRoom() === roomId) {
-      return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: false, shouldShowList: false };
+      return { shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
+    } catch {
+      return { shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
     }
-
-    return { shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
   },
 });
 
