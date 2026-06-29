@@ -67,25 +67,32 @@ export default function HomeScreen() {
           bio: row.bio,
         });
 
-        // 채팅 신청 상태 조회 (매번 fresh)
+        // 채팅 신청 상태 조회 (최신 1건 기준)
         const matchUserId = row.match_user_id;
         if (me && matchUserId) {
           const user = me;
-          const { data: reqData } = await supabase
+          const { data: reqRows } = await supabase
             .from('chat_requests')
-            .select('id, status, room_id, from_user_id')
+            .select('id, status, room_id, from_user_id, created_at')
             .or(`and(from_user_id.eq.${user.id},to_user_id.eq.${matchUserId}),and(from_user_id.eq.${matchUserId},to_user_id.eq.${user.id})`)
-            .maybeSingle();
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          const reqData = reqRows?.[0] ?? null;
+          const isExpired = reqData?.created_at
+            ? new Date(reqData.created_at).getTime() < Date.now() - 24 * 60 * 60 * 1000
+            : false;
 
           if (!reqData) {
             setRequest({ status: 'none', requestId: null, roomId: null });
           } else if (reqData.status === 'accepted') {
             setRequest({ status: 'accepted', requestId: reqData.id, roomId: reqData.room_id });
-          } else if (reqData.status === 'pending' && reqData.from_user_id === user.id) {
+          } else if (reqData.status === 'pending' && !isExpired && reqData.from_user_id === user.id) {
             setRequest({ status: 'pending_sent', requestId: reqData.id, roomId: null });
-          } else if (reqData.status === 'pending' && reqData.from_user_id !== user.id) {
+          } else if (reqData.status === 'pending' && !isExpired && reqData.from_user_id !== user.id) {
             setRequest({ status: 'pending_received', requestId: reqData.id, roomId: null });
           } else {
+            // rejected, expired, 또는 24시간 지난 pending → 재신청 가능
             setRequest({ status: 'none', requestId: null, roomId: null });
           }
         }
