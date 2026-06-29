@@ -29,6 +29,7 @@ interface ChatRoom {
   partner_user_id: string;
   partner_nickname: string;
   partner_company_name: string | null;
+  partner_birth_year: number | null;
   last_message: string | null;
   last_message_at: string | null;
 }
@@ -202,7 +203,9 @@ export default function ChatScreen() {
                         <Text style={styles.avatarSmallText}>{room.partner_nickname[0]}</Text>
                       </View>
                       <View style={styles.roomInfo}>
-                        <Text style={styles.roomNickname}>{room.partner_nickname}</Text>
+                        <Text style={styles.roomNickname}>
+                          {room.partner_nickname}{room.partner_birth_year ? ` · ${new Date().getFullYear() - room.partner_birth_year}세` : ''}
+                        </Text>
                         <Text style={styles.lastMessage} numberOfLines={1}>
                           {room.last_message ?? '대화를 시작해보세요'}
                         </Text>
