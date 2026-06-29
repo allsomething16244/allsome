@@ -5,16 +5,26 @@ import { Session } from '@supabase/supabase-js';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { getActiveRoom } from '../lib/activeRoom';
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    const recipientUserId = notification.request.content.data?.recipientUserId as string | undefined;
+    const data = notification.request.content.data ?? {};
+    const recipientUserId = data.recipientUserId as string | undefined;
+
     if (recipientUserId) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || session.user.id !== recipientUserId) {
         return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: false, shouldShowList: false };
       }
     }
+
+    // 채팅방 안에 있을 때 해당 방 메시지 알림 억제
+    const roomId = data.room_id as string | undefined;
+    if (roomId && getActiveRoom() === roomId) {
+      return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: false, shouldShowList: false };
+    }
+
     return { shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
   },
 });
@@ -29,12 +39,18 @@ export default function RootLayout() {
 
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
-      const recipientUserId = response.notification.request.content.data?.recipientUserId as string | undefined;
+      const data = response.notification.request.content.data ?? {};
+      const recipientUserId = data.recipientUserId as string | undefined;
       if (recipientUserId) {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session || session.user.id !== recipientUserId) return;
       }
-      router.push('/(tabs)/chat');
+      const roomId = data.room_id as string | undefined;
+      if (roomId) {
+        router.push({ pathname: '/chat/[id]', params: { id: roomId } });
+      } else {
+        router.push('/(tabs)/chat');
+      }
     });
     return () => subscription.remove();
   }, []);

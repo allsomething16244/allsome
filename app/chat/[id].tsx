@@ -7,6 +7,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
+import { setActiveRoom } from '../../lib/activeRoom';
 
 interface Message {
   id: string;
@@ -40,6 +41,11 @@ export default function ChatRoomScreen() {
   const oldestCreatedAt = useRef<string | null>(null);
   const partnerUserIdRef = useRef<string | null>(null);
   const userIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setActiveRoom(roomId);
+    return () => setActiveRoom(null);
+  }, [roomId]);
 
   useEffect(() => {
     const init = async () => {
@@ -158,6 +164,12 @@ export default function ChatRoomScreen() {
         if (prev.some(m => m.id === data.id)) return prev;
         return [data, ...prev];
       });
+      // 상대방에게 푸시 알림 (fire-and-forget)
+      if (partner) {
+        supabase.functions.invoke('notify-new-message', {
+          body: { to_user_id: partner.partner_user_id, room_id: roomId },
+        }).catch(() => {});
+      }
     }
     setSending(false);
   };
