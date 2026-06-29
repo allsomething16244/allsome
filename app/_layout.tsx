@@ -7,13 +7,16 @@ import { supabase } from '../lib/supabase';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => {
+    const recipientUserId = notification.request.content.data?.recipientUserId as string | undefined;
+    if (recipientUserId) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || session.user.id !== recipientUserId) {
+        return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: false, shouldShowList: false };
+      }
+    }
+    return { shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
+  },
 });
 
 export default function RootLayout() {
@@ -25,7 +28,12 @@ export default function RootLayout() {
   usePushNotifications(session?.user.id ?? null);
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const recipientUserId = response.notification.request.content.data?.recipientUserId as string | undefined;
+      if (recipientUserId) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session || session.user.id !== recipientUserId) return;
+      }
       router.push('/(tabs)/chat');
     });
     return () => subscription.remove();

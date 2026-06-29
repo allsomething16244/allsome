@@ -94,7 +94,17 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     Alert.alert('로그아웃', '로그아웃 하시겠습니까?', [
       { text: '취소', style: 'cancel' },
-      { text: '로그아웃', style: 'destructive', onPress: () => supabase.auth.signOut() },
+      {
+        text: '로그아웃',
+        style: 'destructive',
+        onPress: async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from('profiles').update({ push_token: null }).eq('id', user.id);
+          }
+          await supabase.auth.signOut();
+        },
+      },
     ]);
   };
 
