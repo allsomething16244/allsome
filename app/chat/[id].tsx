@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
-  TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator,
+  TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ interface Message {
   sender_id: string;
   content: string;
   created_at: string;
+  type?: 'chat' | 'system';
 }
 
 interface Partner {
@@ -23,6 +24,7 @@ interface Partner {
   partner_birth_year: number | null;
   partner_gender: string | null;
   partner_last_read_at: string | null;
+  partner_left: boolean;
 }
 
 const PAGE_SIZE = 50;
@@ -38,6 +40,7 @@ export default function ChatRoomScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
+  const [partnerLeft, setPartnerLeft] = useState(false);
   const oldestCreatedAt = useRef<string | null>(null);
   const partnerUserIdRef = useRef<string | null>(null);
   const userIdRef = useRef<string | null>(null);
@@ -58,6 +61,7 @@ export default function ChatRoomScreen() {
       if (partnerData && partnerData.length > 0) {
         setPartner(partnerData[0]);
         setPartnerLastReadAt(partnerData[0].partner_last_read_at ?? null);
+        setPartnerLeft(partnerData[0].partner_left ?? false);
         partnerUserIdRef.current = partnerData[0].partner_user_id;
       }
 
@@ -67,7 +71,7 @@ export default function ChatRoomScreen() {
       // 최신 PAGE_SIZE개 (내림차순 → inverted FlatList와 맞음)
       const { data } = await supabase
         .from('messages')
-        .select('id, sender_id, content, created_at')
+        .select('id, sender_id, content, created_at, type')
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
@@ -92,6 +96,9 @@ export default function ChatRoomScreen() {
             if (prev.some(m => m.id === newMsg.id)) return prev;
             return [newMsg, ...prev];
           });
+          if (newMsg.type === 'system') {
+            setPartnerLeft(true);
+          }
           // DB 읽음 처리 + broadcast로 상대방에게 즉시 통보
           supabase.rpc('mark_messages_read', { p_room_id: roomId }).then(() => {
             const now = new Date().toISOString();
@@ -131,7 +138,7 @@ export default function ChatRoomScreen() {
 
     const { data } = await supabase
       .from('messages')
-      .select('id, sender_id, content, created_at')
+      .select('id, sender_id, content, created_at, type')
       .eq('room_id', roomId)
       .lt('created_at', oldestCreatedAt.current)
       .order('created_at', { ascending: false })
@@ -145,6 +152,19 @@ export default function ChatRoomScreen() {
     setHasMore(rows.length === PAGE_SIZE);
     setLoadingMore(false);
   }, [loadingMore, hasMore, roomId]);
+
+  const handleLeave = () => {
+    Alert.alert('채팅방 나가기', '채팅방을 나가면 대화 내용을 볼 수 없어요. 나가시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '나가기', style: 'destructive',
+        onPress: async () => {
+          await supabase.rpc('leave_chat_room', { p_room_id: roomId });
+          router.back();
+        },
+      },
+    ]);
+  };
 
   const handleSend = async () => {
     const text = input.trim();
@@ -206,6 +226,9 @@ export default function ChatRoomScreen() {
             <Text style={styles.headerCompany}>{partner.partner_company_name}</Text>
           )}
         </TouchableOpacity>
+        <TouchableOpacity onPress={handleLeave} style={styles.leaveButton}>
+          <MaterialCommunityIcons name="exit-to-app" size={22} color={Colors.textSecondary} />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -219,6 +242,13 @@ export default function ChatRoomScreen() {
           loadingMore ? <ActivityIndicator color={Colors.primary} style={styles.loadingMore} /> : null
         }
         renderItem={({ item }) => {
+          if (item.type === 'system') {
+            return (
+              <View style={styles.systemRow}>
+                <Text style={styles.systemText}>{item.content}</Text>
+              </View>
+            );
+          }
           const isMine = item.sender_id === userId;
           const isRead = isMine && partnerLastReadAt !== null &&
             new Date(item.created_at) <= new Date(partnerLastReadAt);
@@ -240,23 +270,29 @@ export default function ChatRoomScreen() {
         }}
       />
 
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="메시지를 입력하세요"
-          placeholderTextColor={Colors.textSecondary}
-          multiline
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!input.trim() || sending}
-        >
-          <Text style={styles.sendText}>전송</Text>
-        </TouchableOpacity>
-      </View>
+      {partnerLeft ? (
+        <View style={styles.leftNotice}>
+          <Text style={styles.leftNoticeText}>상대방이 나갔습니다</Text>
+        </View>
+      ) : (
+        <View style={styles.inputBar}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="메시지를 입력하세요"
+            placeholderTextColor={Colors.textSecondary}
+            multiline
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
+            onPress={handleSend}
+            disabled={!input.trim() || sending}
+          >
+            <Text style={styles.sendText}>전송</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -308,4 +344,12 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: { backgroundColor: Colors.border },
   sendText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  leaveButton: { padding: 6, marginLeft: 4 },
+  systemRow: { alignItems: 'center', marginVertical: 4 },
+  systemText: { fontSize: 12, color: Colors.textSecondary, backgroundColor: Colors.border, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, overflow: 'hidden' },
+  leftNotice: {
+    paddingVertical: 14, alignItems: 'center',
+    backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  leftNoticeText: { fontSize: 14, color: Colors.textSecondary },
 });
