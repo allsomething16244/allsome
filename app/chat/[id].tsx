@@ -4,6 +4,7 @@ import {
   TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 
@@ -14,6 +15,14 @@ interface Message {
   created_at: string;
 }
 
+interface Partner {
+  partner_user_id: string;
+  partner_nickname: string;
+  partner_company_name: string | null;
+  partner_birth_year: number | null;
+  partner_gender: string | null;
+}
+
 const PAGE_SIZE = 50;
 
 export default function ChatRoomScreen() {
@@ -22,6 +31,7 @@ export default function ChatRoomScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
+  const [partner, setPartner] = useState<Partner | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -33,6 +43,9 @@ export default function ChatRoomScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
+
+      const { data: partnerData } = await supabase.rpc('get_chat_room_partner', { p_room_id: roomId });
+      if (partnerData && partnerData.length > 0) setPartner(partnerData[0]);
 
       // 최신 PAGE_SIZE개 (내림차순 → inverted FlatList와 맞음)
       const { data } = await supabase
@@ -118,9 +131,22 @@ export default function ChatRoomScreen() {
     >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>←</Text>
+          <MaterialCommunityIcons name="chevron-left" size={28} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>채팅</Text>
+        <TouchableOpacity
+          style={styles.headerInfo}
+          onPress={() => partner && router.push({ pathname: '/profile/[id]', params: { id: partner.partner_user_id } })}
+          disabled={!partner}
+        >
+          <Text style={styles.headerNickname}>
+            {partner
+              ? `${partner.partner_nickname}${partner.partner_birth_year ? ` · ${new Date().getFullYear() - partner.partner_birth_year}세` : ''}`
+              : '채팅'}
+          </Text>
+          {partner?.partner_company_name && (
+            <Text style={styles.headerCompany}>{partner.partner_company_name}</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -176,9 +202,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  backButton: { marginRight: 12, padding: 4 },
-  backText: { fontSize: 22, color: Colors.primary },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
+  backButton: { marginRight: 4, padding: 4 },
+  headerInfo: { flex: 1 },
+  headerNickname: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  headerCompany: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
   messageList: { padding: 16, gap: 8 },
   loadingMore: { paddingVertical: 12 },
   bubble: {
