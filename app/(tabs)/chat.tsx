@@ -73,6 +73,14 @@ export default function ChatScreen() {
     }, [])
   );
 
+  const notifyChatResponse = async (requestId: string, action: 'accepted' | 'rejected') => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    supabase.functions.invoke('notify-chat-response', {
+      body: { request_id: requestId, action },
+    }).catch(() => {});
+  };
+
   const handleAccept = async (requestId: string) => {
     const { data: roomId, error } = await supabase.rpc('accept_chat_request', { p_request_id: requestId });
     if (error || !roomId) {
@@ -80,6 +88,7 @@ export default function ChatScreen() {
       return;
     }
     setRequests(prev => prev.filter(r => r.request_id !== requestId));
+    notifyChatResponse(requestId, 'accepted');
     router.push({ pathname: '/chat/[id]', params: { id: roomId } });
   };
 
@@ -90,6 +99,7 @@ export default function ChatScreen() {
       return;
     }
     setRequests(prev => prev.filter(r => r.request_id !== requestId));
+    notifyChatResponse(requestId, 'rejected');
   };
 
   if (loading) {
