@@ -60,6 +60,29 @@ export default function ChatScreen() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('chat-list-messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const { room_id, content, created_at } = payload.new as {
+            room_id: string; content: string; created_at: string;
+          };
+          setRooms(prev => {
+            const idx = prev.findIndex(r => r.room_id === room_id);
+            if (idx === -1) return prev;
+            const updated = { ...prev[idx], last_message: content, last_message_at: created_at };
+            const rest = prev.filter((_, i) => i !== idx);
+            return [updated, ...rest];
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   const formatMessageTime = (isoString: string) => {
     const date = new Date(isoString);
     const today = new Date();
