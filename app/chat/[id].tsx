@@ -21,31 +21,39 @@ interface Partner {
   partner_company_name: string | null;
   partner_birth_year: number | null;
   partner_gender: string | null;
+  partner_last_read_at: string | null;
 }
 
 const PAGE_SIZE = 50;
 
 export default function ChatRoomScreen() {
   const { id: roomId } = useLocalSearchParams<{ id: string }>();
-  // inverted FlatList: 배열 앞쪽 = 최신 메시지
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
   const [partner, setPartner] = useState<Partner | null>(null);
+  const [partnerLastReadAt, setPartnerLastReadAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
   const oldestCreatedAt = useRef<string | null>(null);
+  const partnerUserIdRef = useRef<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
+      userIdRef.current = user.id;
 
       const { data: partnerData } = await supabase.rpc('get_chat_room_partner', { p_room_id: roomId });
-      if (partnerData && partnerData.length > 0) setPartner(partnerData[0]);
+      if (partnerData && partnerData.length > 0) {
+        setPartner(partnerData[0]);
+        setPartnerLastReadAt(partnerData[0].partner_last_read_at ?? null);
+        partnerUserIdRef.current = partnerData[0].partner_user_id;
+      }
 
       // 입장 시 읽음 처리
       await supabase.rpc('mark_messages_read', { p_room_id: roomId });
@@ -73,10 +81,37 @@ export default function ChatRoomScreen() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
         (payload) => {
-          // 새 메시지 → 배열 앞에 추가 (inverted에서 맨 아래 표시)
-          setMessages(prev => [payload.new as Message, ...prev]);
-          // 방에 있는 동안 상대방 메시지 수신 시 바로 읽음 처리
-          void supabase.rpc('mark_messages_read', { p_room_id: roomId });
+          const newMsg = payload.new as Message;
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [newMsg, ...prev];
+          });
+          // DB 읽음 처리 + broadcast로 상대방에게 즉시 통보
+          supabase.rpc('mark_messages_read', { p_room_id: roomId }).then(() => {
+            const now = new Date().toISOString();
+            channel.send({
+              type: 'broadcast',
+              event: 'read_receipt',
+              payload: { sender_id: userIdRef.current, last_read_at: now },
+            });
+          });
+        }
+      )
+      // broadcast: 상대방이 보낸 읽음 이벤트 수신 (postgres_changes보다 훨씬 빠름)
+      .on('broadcast', { event: 'read_receipt' }, ({ payload }) => {
+        if (payload.sender_id !== userIdRef.current) {
+          setPartnerLastReadAt(payload.last_read_at);
+        }
+      })
+      // fallback: chat_room_members UPDATE (입장 시 등)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_room_members', filter: `room_id=eq.${roomId}` },
+        (payload) => {
+          const updated = payload.new as { user_id: string; last_read_at: string };
+          if (updated.user_id === partnerUserIdRef.current) {
+            setPartnerLastReadAt(updated.last_read_at);
+          }
         }
       )
       .subscribe();
@@ -84,7 +119,6 @@ export default function ChatRoomScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [roomId]);
 
-  // 위로 스크롤 시 (inverted에서는 onEndReached) 이전 메시지 로드
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !oldestCreatedAt.current) return;
     setLoadingMore(true);
@@ -112,11 +146,19 @@ export default function ChatRoomScreen() {
 
     setInput('');
     setSending(true);
-    await supabase.from('messages').insert({
-      room_id: roomId,
-      sender_id: userId,
-      content: text,
-    });
+    const { data } = await supabase
+      .from('messages')
+      .insert({ room_id: roomId, sender_id: userId, content: text })
+      .select('id, sender_id, content, created_at')
+      .single();
+
+    // realtime 이벤트 기다리지 않고 바로 표시
+    if (data) {
+      setMessages(prev => {
+        if (prev.some(m => m.id === data.id)) return prev;
+        return [data, ...prev];
+      });
+    }
     setSending(false);
   };
 
@@ -166,11 +208,21 @@ export default function ChatRoomScreen() {
         }
         renderItem={({ item }) => {
           const isMine = item.sender_id === userId;
+          const isRead = isMine && partnerLastReadAt !== null &&
+            new Date(item.created_at) <= new Date(partnerLastReadAt);
+
           return (
-            <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
-              <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextOther]}>
-                {item.content}
-              </Text>
+            <View style={isMine ? styles.rowMine : styles.rowOther}>
+              {isMine && (
+                <Text style={styles.readLabel}>
+                  {isRead ? '읽음' : '1'}
+                </Text>
+              )}
+              <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
+                <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextOther]}>
+                  {item.content}
+                </Text>
+              </View>
             </View>
           );
         }}
@@ -213,10 +265,13 @@ const styles = StyleSheet.create({
   headerCompany: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
   messageList: { padding: 16, gap: 8 },
   loadingMore: { paddingVertical: 12 },
+  rowMine: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'flex-end', gap: 4 },
+  rowOther: { flexDirection: 'row', justifyContent: 'flex-start' },
+  readLabel: { fontSize: 11, color: Colors.primary, marginBottom: 2 },
   bubble: {
     maxWidth: '75%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10,
   },
-  bubbleMine: { alignSelf: 'flex-end', backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
+  bubbleMine: { backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
   bubbleOther: { alignSelf: 'flex-start', backgroundColor: Colors.surface, borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 15, lineHeight: 21 },
   bubbleTextMine: { color: '#fff' },
