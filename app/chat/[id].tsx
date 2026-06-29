@@ -47,6 +47,9 @@ export default function ChatRoomScreen() {
       const { data: partnerData } = await supabase.rpc('get_chat_room_partner', { p_room_id: roomId });
       if (partnerData && partnerData.length > 0) setPartner(partnerData[0]);
 
+      // 입장 시 읽음 처리
+      await supabase.rpc('mark_messages_read', { p_room_id: roomId });
+
       // 최신 PAGE_SIZE개 (내림차순 → inverted FlatList와 맞음)
       const { data } = await supabase
         .from('messages')
@@ -72,6 +75,8 @@ export default function ChatRoomScreen() {
         (payload) => {
           // 새 메시지 → 배열 앞에 추가 (inverted에서 맨 아래 표시)
           setMessages(prev => [payload.new as Message, ...prev]);
+          // 방에 있는 동안 상대방 메시지 수신 시 바로 읽음 처리
+          void supabase.rpc('mark_messages_read', { p_room_id: roomId });
         }
       )
       .subscribe();

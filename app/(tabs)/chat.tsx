@@ -46,6 +46,7 @@ interface ChatRoom {
   partner_gender: string | null;
   last_message: string | null;
   last_message_at: string | null;
+  unread_count: number;
 }
 
 export default function ChatScreen() {
@@ -73,7 +74,12 @@ export default function ChatScreen() {
           setRooms(prev => {
             const idx = prev.findIndex(r => r.room_id === room_id);
             if (idx === -1) return prev;
-            const updated = { ...prev[idx], last_message: content, last_message_at: created_at };
+            const updated = {
+              ...prev[idx],
+              last_message: content,
+              last_message_at: created_at,
+              unread_count: prev[idx].unread_count + 1,
+            };
             const rest = prev.filter((_, i) => i !== idx);
             return [updated, ...rest];
           });
@@ -268,20 +274,29 @@ export default function ChatScreen() {
                         <GenderAvatar gender={room.partner_gender} />
                       </TouchableOpacity>
                       <View style={styles.roomInfo}>
-                        <Text style={styles.roomNickname}>
-                          {room.partner_nickname}{room.partner_birth_year ? ` · ${new Date().getFullYear() - room.partner_birth_year}세` : ''}
-                        </Text>
+                        <View style={styles.roomTopRow}>
+                          <Text style={styles.roomNickname}>
+                            {room.partner_nickname}{room.partner_birth_year ? ` · ${new Date().getFullYear() - room.partner_birth_year}세` : ''}
+                          </Text>
+                          <View style={styles.roomTopRight}>
+                            {room.last_message_at && (
+                              <Text style={styles.messageTime}>{formatMessageTime(room.last_message_at)}</Text>
+                            )}
+                            {room.unread_count > 0 && (
+                              <View style={styles.unreadBadge}>
+                                <Text style={styles.unreadBadgeText}>
+                                  {room.unread_count > 99 ? '99+' : room.unread_count}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
                         {room.partner_company_name && (
                           <Text style={styles.roomCompany}>{room.partner_company_name}</Text>
                         )}
-                        <View style={styles.lastMessageRow}>
-                          <Text style={styles.lastMessage} numberOfLines={1}>
-                            {room.last_message ?? '대화를 시작해보세요'}
-                          </Text>
-                          {room.last_message_at && (
-                            <Text style={styles.messageTime}>{formatMessageTime(room.last_message_at)}</Text>
-                          )}
-                        </View>
+                        <Text style={styles.lastMessage} numberOfLines={1}>
+                          {room.last_message ?? '대화를 시작해보세요'}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -342,9 +357,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   roomInfo: { flex: 1 },
-  roomNickname: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 2 },
+  roomTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  roomTopRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  roomNickname: { fontSize: 15, fontWeight: '600', color: Colors.text, flex: 1 },
   roomCompany: { fontSize: 13, color: Colors.textSecondary, marginBottom: 2 },
-  lastMessageRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  lastMessage: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
-  messageTime: { fontSize: 11, color: Colors.textSecondary, flexShrink: 0 },
+  lastMessage: { fontSize: 13, color: Colors.textSecondary },
+  messageTime: { fontSize: 11, color: Colors.textSecondary },
+  unreadBadge: {
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadgeText: { fontSize: 11, color: '#fff', fontWeight: '700' },
 });
