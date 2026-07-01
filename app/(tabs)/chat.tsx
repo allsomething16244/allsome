@@ -145,25 +145,58 @@ export default function ChatScreen() {
     }).catch(() => {});
   };
 
-  const handleAccept = async (requestId: string) => {
-    const { data: roomId, error } = await supabase.rpc('accept_chat_request', { p_request_id: requestId });
-    if (error || !roomId) {
-      Alert.alert('오류가 발생했습니다.');
-      return;
-    }
-    setRequests(prev => prev.filter(r => r.request_id !== requestId));
-    notifyChatResponse(requestId, 'accepted');
-    router.push({ pathname: '/chat/[id]', params: { id: roomId } });
+  const handleAccept = (requestId: string) => {
+    Alert.alert(
+      '채팅 수락',
+      '수락하면 하트 3개가 차감돼요.\n수락하시겠어요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '수락',
+          onPress: async () => {
+            const { data: roomId, error } = await supabase.rpc('accept_chat_request', { p_request_id: requestId });
+            if (error) {
+              if (error.message.includes('INSUFFICIENT_HEARTS')) {
+                Alert.alert('하트가 부족해요', '채팅 수락에는 하트 3개가 필요해요.', [
+                  { text: '취소', style: 'cancel' },
+                  { text: '충전하기', onPress: () => router.push('/heart-shop') },
+                ]);
+              } else {
+                Alert.alert('오류가 발생했습니다.');
+              }
+              return;
+            }
+            if (!roomId) { Alert.alert('오류가 발생했습니다.'); return; }
+            setRequests(prev => prev.filter(r => r.request_id !== requestId));
+            notifyChatResponse(requestId, 'accepted');
+            router.push({ pathname: '/chat/[id]', params: { id: roomId } });
+          },
+        },
+      ]
+    );
   };
 
-  const handleReject = async (requestId: string) => {
-    const { error } = await supabase.rpc('reject_chat_request', { p_request_id: requestId });
-    if (error) {
-      Alert.alert('오류가 발생했습니다.');
-      return;
-    }
-    setRequests(prev => prev.filter(r => r.request_id !== requestId));
-    notifyChatResponse(requestId, 'rejected');
+  const handleReject = (requestId: string) => {
+    Alert.alert(
+      '채팅 거절',
+      '거절하면 상대방에게 하트 1개가 환불돼요.\n거절하시겠어요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '거절',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.rpc('reject_chat_request', { p_request_id: requestId });
+            if (error) {
+              Alert.alert('오류가 발생했습니다.');
+              return;
+            }
+            setRequests(prev => prev.filter(r => r.request_id !== requestId));
+            notifyChatResponse(requestId, 'rejected');
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -251,7 +284,7 @@ export default function ChatScreen() {
                           onPress={() => handleAccept(req.request_id)}
                           disabled={formatRemaining(req.requested_at) === '만료됨'}
                         >
-                          <Text style={styles.acceptText}>수락</Text>
+                          <Text style={styles.acceptText}>수락 🤍3</Text>
                         </TouchableOpacity>
                       </View>
                     </View>

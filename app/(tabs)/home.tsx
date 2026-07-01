@@ -28,6 +28,7 @@ export default function HomeScreen() {
   const [noBio, setNoBio] = useState(false);
   const [request, setRequest] = useState<RequestState>({ status: 'none', requestId: null, roomId: null });
   const [requesting, setRequesting] = useState(false);
+  const [heartBalance, setHeartBalance] = useState<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,6 +51,14 @@ export default function HomeScreen() {
             return;
           }
         }
+
+        // 하트 잔액 조회
+        const { data: heartsData } = await supabase
+          .from('user_hearts')
+          .select('balance')
+          .eq('user_id', me.id)
+          .maybeSingle();
+        setHeartBalance(heartsData?.balance ?? 0);
 
         const { data, error } = await supabase.rpc('get_or_create_daily_match');
         if (error || !data || data.length === 0) {
@@ -120,7 +129,19 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const handleSendRequest = async () => {
+  const handleSendRequest = () => {
+    if (!match) return;
+    Alert.alert(
+      '채팅 신청',
+      '신청하면 하트 3개가 차감돼요.\n신청하시겠어요?',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '신청', onPress: doSendRequest },
+      ]
+    );
+  };
+
+  const doSendRequest = async () => {
     if (!match) return;
     setRequesting(true);
     try {
@@ -133,11 +154,17 @@ export default function HomeScreen() {
           Alert.alert('오늘의 추천 상대에게만 채팅을 신청할 수 있어요.');
         } else if (error.message.includes('ALREADY_EXISTS')) {
           Alert.alert('이미 채팅 신청이 있거나 채팅방이 존재해요.');
+        } else if (error.message.includes('INSUFFICIENT_HEARTS')) {
+          Alert.alert('하트가 부족해요', '채팅 신청에는 하트 3개가 필요해요.', [
+            { text: '취소', style: 'cancel' },
+            { text: '충전하기', onPress: () => router.push('/heart-shop') },
+          ]);
         } else {
           Alert.alert('오류가 발생했습니다. 다시 시도해주세요.');
         }
         return;
       }
+      setHeartBalance(prev => prev !== null ? prev - 3 : prev);
       setRequest({ status: 'pending_sent', requestId: requestId as string, roomId: null });
 
       supabase.functions.invoke('notify-chat-request', {
@@ -181,7 +208,12 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
-      <Text style={styles.headerLabel}>오늘의 추천</Text>
+      <View style={styles.topBar}>
+        <Text style={styles.headerLabel}>오늘의 추천</Text>
+        <TouchableOpacity style={styles.heartBadge} onPress={() => router.push('/heart-shop')}>
+          <Text style={styles.heartBadgeText}>🤍 {heartBalance ?? '-'}</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.card}>
         <View style={styles.avatarCircle}>
@@ -244,7 +276,7 @@ export default function HomeScreen() {
             onPress={handleSendRequest}
             disabled={requesting}
           >
-            <Text style={styles.chatButtonText}>{requesting ? '신청 중...' : '채팅 신청'}</Text>
+            <Text style={styles.chatButtonText}>{requesting ? '신청 중...' : '채팅 신청  🤍 3'}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -257,10 +289,18 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   inner: { flexGrow: 1, alignItems: 'center', paddingTop: 80, paddingBottom: 40, paddingHorizontal: 24 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 24 },
+  heartBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.surface, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  heartBadgeText: { fontSize: 14, fontWeight: '600', color: Colors.text },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   headerLabel: {
     fontSize: 13, fontWeight: '600', color: Colors.primary,
-    letterSpacing: 1, textTransform: 'uppercase', marginBottom: 24,
+    letterSpacing: 1, textTransform: 'uppercase',
   },
   card: {
     width: '100%', backgroundColor: Colors.surface, borderRadius: 24,
